@@ -1,0 +1,50 @@
+/* frontend/src/components/ProdutoItem.module.css */
+
+.productItem {
+  border: 1px solid #eee;
+  padding: 15px;
+  margin: 10px 0;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.productInfo p {
+  margin: 5px 0;
+  color: #444;
+}
+
+.productInfo strong {
+  color: #222;
+}
+
+.buttonGroup button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.editButton {
+  background-color: #007bff;
+  color: white;
+  margin-right: 10px;
+}
+
+.editButton:hover {
+  background-color: #0056b3;
+}
+
+.deleteButton {
+  background-color: #dc3545;
+  color: white;
+}
+
+.deleteButton:hover {
+  background-color: #c82333;
+}

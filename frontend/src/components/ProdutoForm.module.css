@@ -1,0 +1,35 @@
+/* frontend/src/components/ProdutoForm.module.css */
+
+.formContainer {
+  border: 1px solid #ddd;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  background-color: #ffffff;
+}
+
+.formContainer h3 {
+  color: #333;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.formContainer div {
+  margin-bottom: 15px;
+}
+
+.formContainer input[type="text"],
+.formContainer input[type="number"] {
+  width: calc(100% - 22px); /* Ajusta para padding e borda */
+}
+
+.formContainer button[type="submit"] {
+  margin-top: 10px;
+}
+
+/* Reutilizando estilo de erro global, mas adicionando especificidade se necessário */
+.formContainer .validationError {
+  color: red;
+  font-size: 0.8em;
+  margin-top: 5px;
+}

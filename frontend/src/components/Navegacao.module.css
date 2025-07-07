@@ -1,0 +1,28 @@
+/* frontend/src/components/Navegacao.module.css */
+
+.navContainer {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.navButton {
+  padding: 10px 20px;
+  margin: 0 10px;
+  font-size: 16px;
+  cursor: pointer;
+  border: 1px solid #007bff;
+  border-radius: 5px;
+  background-color: white; /* padrão */
+  color: #007bff; /* padrão */
+  text-decoration: none;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.navButton:hover {
+  background-color: #e6f2ff; /* Um azul mais claro no hover */
+}
+
+.navButton.active {
+  background-color: #007bff;
+  color: white;
+}
