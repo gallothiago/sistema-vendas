@@ -1,134 +1,180 @@
-// frontend/src/components/VendaForm.jsx
-import React, { useState } from 'react';
-import styles from './VendaForm.module.css'; // Importa o CSS Module
+// sistema_de_vendas_novo/frontend/src/components/VendaForm.jsx
+import React, { useState, useEffect } from 'react';
+import { TextField, Button, Box, Typography, Paper, FormControl, InputLabel, Select, MenuItem } from '@mui/material'; // Importa componentes MUI
+// import styles from '../App.module.css'; // Não precisamos mais dos estilos de formulário aqui
 
-function VendaForm({ produtos, onVendaRegistrada, onError }) {
-  const [produtoSelecionadoId, setProdutoSelecionadoId] = useState('');
-  const [quantidadeVendida, setQuantidadeVendida] = useState('');
-  const [formaPagamento, setFormaPagamento] = useState('Dinheiro');
+function VendaForm({ onVendaSaved, showToast }) {
+  const [produtosDisponiveis, setProdutosDisponiveis] = useState([]);
+  const [vendaForm, setVendaForm] = useState({
+    produto_id: '',
+    quantidade: '',
+    forma_pagamento: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
 
-  const [produtoIdError, setProdutoIdError] = useState('');
-  const [quantidadeVendaError, setQuantidadeVendaError] = useState('');
+  useEffect(() => {
+    const fetchProdutosDisponiveis = async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:5000/produtos?per_page=999');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setProdutosDisponiveis(data.produtos);
+      } catch (err) {
+        console.error("Erro ao buscar produtos para venda:", err);
+        showToast('Erro ao carregar produtos para venda!', 'error');
+      }
+    };
+    fetchProdutosDisponiveis();
+  }, [showToast]);
+
+  const selectedProduto = produtosDisponiveis.find(p => p.id === parseInt(vendaForm.produto_id));
+  const precoUnitario = selectedProduto ? selectedProduto.preco : 0;
+  const precoTotal = precoUnitario * (vendaForm.quantidade || 0);
 
   const validateForm = () => {
-    let isValid = true;
-    setProdutoIdError('');
-    setQuantidadeVendaError('');
-    onError(null);
-
-    if (!produtoSelecionadoId) {
-      setProdutoIdError('Por favor, selecione um produto.');
-      isValid = false;
+    const errors = {};
+    if (!vendaForm.produto_id) {
+      errors.produto_id = 'Selecione um produto.';
     }
-
-    const parsedQuantidade = parseInt(quantidadeVendida);
-    if (isNaN(parsedQuantidade) || parsedQuantidade <= 0) {
-      setQuantidadeVendaError('A quantidade vendida deve ser um número inteiro positivo.');
-      isValid = false;
-    } else {
-      const produtoNoEstoque = produtos.find(p => p.id === parseInt(produtoSelecionadoId));
-      if (produtoNoEstoque && parsedQuantidade > produtoNoEstoque.quantidade) {
-        setQuantidadeVendaError(`Estoque insuficiente. Disponível: ${produtoNoEstoque.quantidade}.`);
-        isValid = false;
-      }
+    if (vendaForm.quantidade === '' || isNaN(vendaForm.quantidade) || parseInt(vendaForm.quantidade) <= 0 || !Number.isInteger(parseFloat(vendaForm.quantidade))) {
+      errors.quantidade = 'Quantidade inválida (deve ser um número inteiro positivo).';
+    } else if (selectedProduto && parseInt(vendaForm.quantidade) > selectedProduto.quantidade) {
+      errors.quantidade = `Quantidade em estoque insuficiente. Disponível: ${selectedProduto.quantidade}`;
     }
-
-    return isValid;
+    if (!vendaForm.forma_pagamento.trim()) {
+      errors.forma_pagamento = 'Forma de pagamento é obrigatória.';
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setVendaForm({
+      ...vendaForm,
+      [name]: value
+    });
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!validateForm()) {
+      showToast('Por favor, corrija os erros no formulário de venda.', 'error');
       return;
     }
 
-    const produtoVendido = produtos.find(p => p.id === parseInt(produtoSelecionadoId));
-    const valorTotal = produtoVendido.preco * parseInt(quantidadeVendida);
-
-    const novaVenda = {
-      produto_id: parseInt(produtoSelecionadoId),
-      quantidade: parseInt(quantidadeVendida),
-      forma_pagamento: formaPagamento,
-      valor_total: parseFloat(valorTotal.toFixed(2))
+    const payload = {
+      produto_id: parseInt(vendaForm.produto_id),
+      quantidade: parseInt(vendaForm.quantidade),
+      forma_pagamento: vendaForm.forma_pagamento
     };
 
-    fetch('http://127.0.0.1:5000/vendas', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(novaVenda),
-    })
-      .then(response => {
-        if (!response.ok) {
-          return response.json().then(err => { throw new Error(err.error || `HTTP error! status: ${response.status}`); });
-        }
-        return response.json();
-      })
-      .then(data => {
-        console.log('Venda registrada:', data);
-        setProdutoSelecionadoId('');
-        setQuantidadeVendida('');
-        setFormaPagamento('Dinheiro');
-        onVendaRegistrada();
-        setProdutoIdError('');
-        setQuantidadeVendaError('');
-      })
-      .catch(error => {
-        console.error("Erro ao registrar venda:", error);
-        onError(error);
+    setLoading(true);
+    try {
+      const response = await fetch('http://127.0.0.1:5000/vendas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      setVendaForm({ produto_id: '', quantidade: '', forma_pagamento: '' });
+      onVendaSaved();
+      showToast('Venda registrada com sucesso!', 'success');
+
+    } catch (err) {
+      console.error("Erro ao registrar venda:", err);
+      let errorMessage = `Erro ao registrar venda: ${err.message}`;
+      showToast(errorMessage, 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className={styles.formContainer}>
-      <h3>Registrar Nova Venda</h3>
-      <div>
-        <label htmlFor="produtoVenda">Produto:</label>
-        <select
-          id="produtoVenda"
-          value={produtoSelecionadoId}
-          onChange={(e) => setProdutoSelecionadoId(e.target.value)}
-          required
-        >
-          <option value="">Selecione um produto</option>
-          {produtos.map(produto => (
-            <option key={produto.id} value={produto.id}>
-              {produto.nome} (Estoque: {produto.quantidade})
-            </option>
-          ))}
-        </select>
-        {produtoIdError && <p className={styles.validationError}>{produtoIdError}</p>}
-      </div>
-      <div>
-        <label htmlFor="quantidadeVenda">Quantidade:</label>
-        <input
+    <Paper component="form" onSubmit={handleSubmit} elevation={2} sx={{ padding: 4, borderRadius: '10px', mb: 4, border: '1px solid #cfd8dc' }}>
+      <Typography variant="h3" component="h3" align="center" sx={{ mb: 3, pb: 1.5, borderBottom: '1px solid #eee' }}>
+        Registrar Nova Venda
+      </Typography>
+      <Box sx={{ mb: 2 }}>
+        <FormControl fullWidth error={!!formErrors.produto_id}>
+          <InputLabel id="produto-select-label">Produto</InputLabel>
+          <Select
+            labelId="produto-select-label"
+            id="produto_id"
+            name="produto_id"
+            value={vendaForm.produto_id}
+            label="Produto"
+            onChange={handleFormChange}
+            disabled={loading}
+          >
+            <MenuItem value="">
+              <em>Selecione um produto</em>
+            </MenuItem>
+            {produtosDisponiveis.map(produto => (
+              <MenuItem key={produto.id} value={produto.id}>
+                {produto.nome} (Estoque: {produto.quantidade}) - R$ {parseFloat(produto.preco).toFixed(2).replace('.', ',')}
+              </MenuItem>
+            ))}
+          </Select>
+          {formErrors.produto_id && <Typography color="error" variant="caption">{formErrors.produto_id}</Typography>}
+        </FormControl>
+      </Box>
+      <Box sx={{ mb: 2 }}>
+        <TextField
+          label="Quantidade"
+          id="quantidade"
+          name="quantidade"
           type="number"
-          id="quantidadeVenda"
-          value={quantidadeVendida}
-          onChange={(e) => setQuantidadeVendida(e.target.value)}
-          min="1"
-          required
+          value={vendaForm.quantidade}
+          onChange={handleFormChange}
+          error={!!formErrors.quantidade}
+          helperText={formErrors.quantidade}
+          disabled={loading}
+          fullWidth
         />
-        {quantidadeVendaError && <p className={styles.validationError}>{quantidadeVendaError}</p>}
-      </div>
-      <div>
-        <label htmlFor="formaPagamento">Forma de Pagamento:</label>
-        <select
-          id="formaPagamento"
-          value={formaPagamento}
-          onChange={(e) => setFormaPagamento(e.target.value)}
-          required
-        >
-          <option value="Dinheiro">Dinheiro</option>
-          <option value="Cartao de Credito">Cartão de Crédito</option>
-          <option value="Cartao de Debito">Cartão de Débito</option>
-          <option value="Pix">Pix</option>
-        </select>
-      </div>
-      <button type="submit">Registrar Venda</button>
-    </form>
+      </Box>
+      <Typography variant="body1" sx={{ mb: 1 }}>Preço Unitário: R$ {precoUnitario.toFixed(2).replace('.', ',')}</Typography>
+      <Typography variant="body1" sx={{ mb: 3 }}>Preço Total da Venda: R$ {precoTotal.toFixed(2).replace('.', ',')}</Typography>
+      <Box sx={{ mb: 3 }}>
+        <FormControl fullWidth error={!!formErrors.forma_pagamento}>
+          <InputLabel id="forma-pagamento-select-label">Forma de Pagamento</InputLabel>
+          <Select
+            labelId="forma-pagamento-select-label"
+            id="forma_pagamento"
+            name="forma_pagamento"
+            value={vendaForm.forma_pagamento}
+            label="Forma de Pagamento"
+            onChange={handleFormChange}
+            disabled={loading}
+          >
+            <MenuItem value="">
+              <em>Selecione a forma de pagamento</em>
+            </MenuItem>
+            <MenuItem value="Cartao de Credito">Cartão de Crédito</MenuItem>
+            <MenuItem value="Debito">Débito</MenuItem>
+            <MenuItem value="Dinheiro">Dinheiro</MenuItem>
+            <MenuItem value="Pix">Pix</MenuItem>
+          </Select>
+          {formErrors.forma_pagamento && <Typography color="error" variant="caption">{formErrors.forma_pagamento}</Typography>}
+        </FormControl>
+      </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+        <Button type="submit" variant="contained" color="primary" disabled={loading}>
+          Registrar Venda
+        </Button>
+      </Box>
+    </Paper>
   );
 }
 

@@ -1,4 +1,4 @@
-/* sistema_de_vendas_novo/frontend/src/index.css */
+/* sistema_de_vendas_novo/frontend/src/App.css */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 
 :root {
@@ -31,7 +31,7 @@ code {
     monospace;
 }
 
-/* Estilos para o toast (manter) */
+/* Estilos para o toast */
 .toast-container {
   position: fixed;
   top: 20px;
@@ -50,7 +50,6 @@ code {
   animation: fade-in 0.4s forwards;
   max-width: 300px;
   word-wrap: break-word;
-  position: relative; /* Adicionado para posicionar o botão de fechar */
 }
 
 .toast.success {
@@ -81,7 +80,57 @@ code {
   }
 }
 
-/* Estilos para o botão de fechar do toast (manter) */
+/* Estilo para botões gerais */
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    opacity: 0.7;
+    box-shadow: none;
+}
+
+/* Estilo de input geral */
+input[type="text"],
+input[type="number"],
+select {
+  border: 1px solid var(--border-color);
+  padding: 10px 12px;
+  border-radius: 5px;
+  font-size: 1em;
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+  box-sizing: border-box; /* Garante que padding e border sejam incluídos na largura */
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+  outline: none;
+}
+
+/* Estilos para o botão de fechar do toast */
 .close-toast-button {
   background: none;
   border: none;

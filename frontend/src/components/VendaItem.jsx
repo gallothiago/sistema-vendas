@@ -1,25 +1,19 @@
-// frontend/src/components/VendaItem.jsx
+// sistema_de_vendas_novo/frontend/src/components/VendaItem.jsx
 import React from 'react';
-import styles from './VendaItem.module.css'; // Importa o CSS Module
+import { TableCell, TableRow } from '@mui/material'; // Importa componentes MUI
+// import styles from '../App.module.css'; // Não precisamos mais dos estilos de tabela aqui
 
 function VendaItem({ venda }) {
-    // Se você quiser exibir o nome do produto, você precisará fazer uma requisição
-
   return (
-    <li className={styles.vendaItem}>
-      <div>
-        <p><strong>Venda ID:</strong> {venda.id}</p>
-        <p><strong>Produto ID:</strong> {venda.produto_id}</p>
-        {/* Se quiser o nome do produto, descomente e ajuste conforme a nota acima: */}
-        {/* <p><strong>Produto:</strong> {nomeProduto}</p> */}
-        <p><strong>Quantidade:</strong> {venda.quantidade}</p>
-      </div>
-      <div>
-        <p><strong>Forma de Pagamento:</strong> {venda.forma_pagamento}</p>
-        <p><strong>Data:</strong> {new Date(venda.data_venda).toLocaleDateString()}</p>
-        <p className={styles.vendaValue}><strong>Valor Total:</strong> R${venda.valor_total.toFixed(2)}</p>
-      </div>
-    </li>
+    <TableRow>
+      <TableCell>{venda.id}</TableCell>
+      <TableCell>{venda.produto_nome}</TableCell>
+      <TableCell>{venda.quantidade}</TableCell>
+      <TableCell>R$ {parseFloat(venda.preco_unitario).toFixed(2).replace('.', ',')}</TableCell>
+      <TableCell>R$ {parseFloat(venda.preco_total).toFixed(2).replace('.', ',')}</TableCell>
+      <TableCell>{venda.forma_pagamento}</TableCell>
+      <TableCell>{new Date(venda.data_venda).toLocaleString('pt-BR')}</TableCell>
+    </TableRow>
   );
 }
 

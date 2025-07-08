@@ -1,388 +1,220 @@
-// frontend/src/App.jsx
-import { useState, useEffect, useMemo } from 'react';
-import styles from './App.module.css'; // Importa App.module.css
-import ProdutoItem from './components/ProdutoItem';
-import VendaForm from './components/VendaForm';
+// sistema_de_vendas_novo/frontend/src/App.jsx
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+
+// Importações do MUI
+import { Container, AppBar, Toolbar, Typography, Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search'; // Exemplo de ícone, pode ser usado depois
+import InputAdornment from '@mui/material/InputAdornment'; // Para ícone no input
+import TextField from '@mui/material/TextField'; // Para o campo de busca
+
+// Importa todos os componentes necessários
 import ProdutoForm from './components/ProdutoForm';
-import Navegacao from './components/Navegacao';
-import VendaItem from './components/VendaItem';
+import ProdutoItem from './components/ProdutoItem';
+import Vendas from './components/Vendas';
 import Relatorios from './components/Relatorios';
-import ConfirmModal from './components/ConfirmModal';
+import Toast from './components/Toast';
+import Navegacao from './components/Navegacao';
+import LoadingSpinner from './components/LoadingSpinner';
+
+// Importa os estilos CSS (agora mais enxutos)
+import './index.css'; // Alterado de App.css para index.css para o CSS global
+import styles from './App.module.css'; // Para layout principal e classes que não são de componentes MUI
 
 function App() {
+  const [toast, setToast] = useState(null);
   const [produtos, setProdutos] = useState([]);
-  const [vendas, setVendas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [editingProduto, setEditingProduto] = useState(null);
-  const [editNome, setEditNome] = useState('');
-  const [editQuantidade, setEditQuantidade] = useState('');
-  const [editPreco, setEditPreco] = useState('');
+  const [produtoToEdit, setProdutoToEdit] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const [currentView, setCurrentView] = useState('produtos');
-  const [successMessage, setSuccessMessage] = useState(null);
-
-  const [searchTermProduto, setSearchTermProduto] = useState('');
-  const [filterProdutoVenda, setFilterProdutoVenda] = useState('');
-  const [filterFormaPagamentoVenda, setFilterFormaPagamentoVenda] = useState('');
-
-  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [produtoToDeleteId, setProdutoToDeleteId] = useState(null);
-  const [produtoToDeleteNome, setProdutoToDeleteNome] = useState('');
-
-
-  const showSuccessMessage = (message) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(null), 3000);
+  const showToast = (message, type) => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3000);
   };
 
-  const fetchData = () => {
+  const fetchProdutos = async (page = 1, search = '') => {
     setLoading(true);
     setError(null);
-    setSuccessMessage(null);
-
-    const fetchProdutosPromise = fetch('http://127.0.0.1:5000/produtos')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        setProdutos(data);
-      })
-      .catch(error => {
-        console.error("Erro ao buscar produtos:", error);
-        setError(error);
-        throw error;
-      });
-
-    const fetchVendasPromise = fetch('http://127.0.0.1:5000/vendas')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(data => {
-        setVendas(data);
-      })
-      .catch(error => {
-        console.error("Erro ao buscar vendas:", error);
-        setError(error);
-        throw error;
-      });
-
-    Promise.all([fetchProdutosPromise, fetchVendasPromise])
-      .finally(() => {
-        setLoading(false);
-      });
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/produtos?page=${page}&search=${search}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setProdutos(data.produtos);
+      setTotalPages(data.total_pages);
+      setCurrentPage(data.current_page);
+    } catch (err) {
+      console.error("Erro ao buscar produtos:", err);
+      setError(err);
+      showToast('Erro ao carregar produtos!', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchProdutos(currentPage, searchTerm);
+  }, [currentPage, searchTerm]);
 
-  const handleEditClick = (produto) => {
-    setEditingProduto(produto);
-    setEditNome(produto.nome);
-    setEditQuantidade(produto.quantidade);
-    setEditPreco(produto.preco);
-    setError(null);
-    setSuccessMessage(null);
+  const handleProdutoSaved = async () => {
+    setProdutoToEdit(null);
+    await fetchProdutos(1, searchTerm); // Sempre vai para a primeira página após salvar
+    setCurrentPage(1);
   };
 
-  const handleUpdateProduto = (e) => {
-    e.preventDefault();
-    if (!editingProduto) return;
-
-    const produtoAtualizado = {
-      nome: editNome,
-      quantidade: editQuantidade !== '' ? parseInt(editQuantidade) : 0,
-      preco: editPreco !== '' ? parseFloat(editPreco) : 0.0,
-    };
-
-    if (isNaN(produtoAtualizado.quantidade) || isNaN(produtoAtualizado.preco) || produtoAtualizado.quantidade < 0 || produtoAtualizado.preco < 0) {
-      setError(new Error("Quantidade e Preço na edição devem ser números válidos e não negativos."));
-      return;
-    }
-
-    fetch(`http://127.0.0.1:5000/produtos/${editingProduto.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(produtoAtualizado),
-    })
-      .then(response => {
-        if (!response.ok) {
-          return response.json().then(err => { throw new Error(err.error || `HTTP error! status: ${response.status}`); });
-        }
-        return response.json();
-      })
-      .then(data => {
-        console.log('Produto atualizado:', data);
-        setEditingProduto(null);
-        fetchData();
-        showSuccessMessage(`Produto "${data.nome}" atualizado com sucesso!`);
-        setError(null);
-      })
-      .catch(error => {
-        console.error("Erro ao atualizar produto:", error);
-        setError(error);
-        setSuccessMessage(null);
-      });
+  const handleEditRequest = (produto) => {
+    setProdutoToEdit(produto);
   };
 
-  const openConfirmModal = (id, nome) => {
-    setProdutoToDeleteId(id);
-    setProdutoToDeleteNome(nome);
-    setIsConfirmModalOpen(true);
+  const handleCancelEdit = () => {
+    setProdutoToEdit(null);
   };
 
-  const closeConfirmModal = () => {
-    setIsConfirmModalOpen(false);
-    setProdutoToDeleteId(null);
-    setProdutoToDeleteNome('');
-  };
-
-  const confirmDeleteProduto = () => {
-    if (produtoToDeleteId) {
-      fetch(`http://127.0.0.1:5000/produtos/${produtoToDeleteId}`, {
-        method: 'DELETE',
-      })
-        .then(response => {
-          if (!response.ok) {
-            return response.json().then(err => { throw new Error(err.error || `HTTP error! status: ${response.status}`); });
-          }
-          if (response.status === 204) {
-            return {};
-          }
-          return response.json();
-        })
-        .then(() => {
-          console.log('Produto excluído com sucesso.');
-          fetchData();
-          showSuccessMessage(`Produto "${produtoToDeleteNome}" excluído com sucesso!`);
-          setError(null);
-          closeConfirmModal();
-        })
-        .catch(error => {
-          console.error("Erro ao excluir produto:", error);
-          setError(error);
-          setSuccessMessage(null);
-          closeConfirmModal();
-        });
+  const handleProdutoDeleted = async () => {
+    if (produtos.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+    } else {
+        await fetchProdutos(currentPage, searchTerm);
     }
   };
 
-  const filteredProdutos = useMemo(() => {
-    return produtos.filter(produto =>
-      produto.nome.toLowerCase().includes(searchTermProduto.toLowerCase())
-    );
-  }, [produtos, searchTermProduto]);
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
 
-  const filteredVendas = useMemo(() => {
-    let vendasFiltradas = vendas;
-
-    if (filterProdutoVenda) {
-      vendasFiltradas = vendasFiltradas.filter(venda =>
-        venda.produto_id === parseInt(filterProdutoVenda)
-      );
+  const handlePageChange = (page) => {
+    if (page > 0 && page <= totalPages) {
+      setCurrentPage(page);
     }
-
-    if (filterFormaPagamentoVenda) {
-      vendasFiltradas = vendasFiltradas.filter(venda =>
-        venda.forma_pagamento.toLowerCase() === filterFormaPagamentoVenda.toLowerCase()
-      );
-    }
-    return vendasFiltradas;
-  }, [vendas, filterProdutoVenda, filterFormaPagamentoVenda]);
-
-
-  if (loading) {
-    return <div>Carregando dados...</div>;
-  }
+  };
 
   return (
-    <div className={styles.App}> {/* Usa a classe CSS Module */}
-      <h1>Sistema de Vendas</h1>
+    <Router>
+      <Box className={styles.appContainer}>
+        <AppBar position="static" sx={{ backgroundColor: 'secondary.main', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)' }}>
+          <Toolbar sx={{ flexDirection: 'column', paddingY: 2 }}>
+            <Typography variant="h1" component="div" sx={{ flexGrow: 1, color: 'white', fontSize: '2.2em', marginBottom: '15px' }}>
+              Sistema de Gestão de Vendas
+            </Typography>
+            <Navegacao />
+          </Toolbar>
+        </AppBar>
 
-      <Navegacao view={currentView} setView={setCurrentView} />
-
-      {error && (
-        <div className={styles.errorMessage}> {/* Usa a classe CSS Module */}
-          <strong>Erro:</strong> {error.message}
-        </div>
-      )}
-
-      {successMessage && (
-        <div className={styles.successMessage}> {/* Usa a classe CSS Module */}
-          <strong>Sucesso:</strong> {successMessage}
-        </div>
-      )}
-
-      <ConfirmModal
-        isOpen={isConfirmModalOpen}
-        message={`Tem certeza que deseja excluir o produto "${produtoToDeleteNome}"? Esta ação é irreversível.`}
-        onConfirm={confirmDeleteProduto}
-        onCancel={closeConfirmModal}
-      />
-
-      {/* Conteúdo da Visão de Produtos */}
-      {currentView === 'produtos' && (
-        <>
-          <ProdutoForm
-            onProdutoCadastrado={() => {
-              fetchData();
-              showSuccessMessage('Produto cadastrado com sucesso!');
-            }}
-            onError={setError}
-          />
-
-          <hr /> {/* HR pode manter-se sem classe se for estilo global */}
-
-          {editingProduto && (
-            <div className={styles.formContainer}> {/* Poderia ser um estilo global ou em ProdutoForm.module.css */}
-              <h2>Editar Produto: {editingProduto.nome}</h2>
-              <form onSubmit={handleUpdateProduto}>
-                <div>
-                  <label htmlFor="editNome">Nome:</label>
-                  <input
-                    type="text"
-                    id="editNome"
-                    value={editNome}
-                    onChange={(e) => setEditNome(e.target.value)}
-                    required
+        <Container component="main" maxWidth="lg" sx={{ flexGrow: 1, paddingY: 4, marginY: 4 }}>
+          <Paper elevation={3} sx={{ padding: 4, borderRadius: '10px' }}>
+            <Routes>
+              <Route path="/produtos" element={
+                <Box>
+                  <Typography variant="h2" component="h2" align="center" sx={{ mb: 4, color: 'primary.main' }}>
+                    Gestão de Produtos
+                  </Typography>
+                  <ProdutoForm
+                    produtoToEdit={produtoToEdit}
+                    onProdutoSaved={handleProdutoSaved}
+                    onCancelEdit={handleCancelEdit}
+                    showToast={showToast}
                   />
-                </div>
-                <div>
-                  <label htmlFor="editQuantidade">Quantidade:</label>
-                  <input
-                    type="number"
-                    id="editQuantidade"
-                    value={editQuantidade}
-                    onChange={(e) => setEditQuantidade(e.target.value)}
-                    required
-                    min="0"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="editPreco">Preço:</label>
-                  <input
-                    type="number"
-                    id="editPreco"
-                    step="0.01"
-                    value={editPreco}
-                    onChange={(e) => setEditPreco(e.target.value)}
-                    required
-                    min="0"
-                  />
-                </div>
-                <button type="submit">Salvar Alterações</button>
-                <button type="button" onClick={() => setEditingProduto(null)} className={styles.secondaryButton}> {/* Exemplo de classe reutilizável */}
-                  Cancelar
-                </button>
-              </form>
-            </div>
-          )}
 
-          <h2>Lista de Produtos em Estoque</h2>
-          <div className={styles.searchFilterContainer}> {/* Novo estilo para o container de busca */}
-            <label htmlFor="searchProduto">Buscar Produto por Nome:</label>
-            <input
-              type="text"
-              id="searchProduto"
-              value={searchTermProduto}
-              onChange={(e) => setSearchTermProduto(e.target.value)}
-              placeholder="Digite o nome do produto..."
-            />
-          </div>
+                  <Box sx={{ mb: 4, textAlign: 'center' }}>
+                    <TextField
+                      label="Buscar produto por nome"
+                      variant="outlined"
+                      value={searchTerm}
+                      onChange={handleSearchChange}
+                      sx={{ width: '60%', maxWidth: '500px' }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Box>
 
-          {filteredProdutos.length === 0 ? (
-            <p>Nenhum produto encontrado com os critérios de busca.</p>
-          ) : (
-            <ul>
-              {filteredProdutos.map(produto => (
-                <ProdutoItem
-                  key={produto.id}
-                  produto={produto}
-                  onEdit={handleEditClick}
-                  onDelete={openConfirmModal}
-                />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
+                  <TableContainer component={Paper} sx={{ mb: 4, borderRadius: '8px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)', border: '1px solid var(--border-color)' }}>
+                    <Table sx={{ minWidth: 650 }} aria-label="tabela de produtos">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>ID</TableCell>
+                          <TableCell>Nome</TableCell>
+                          <TableCell>Quantidade</TableCell>
+                          <TableCell>Preço (R$)</TableCell>
+                          <TableCell>Ações</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {loading && produtos.length === 0 && !error ? (
+                          <TableRow>
+                            <TableCell colSpan={5} align="center">
+                              <LoadingSpinner />
+                            </TableCell>
+                          </TableRow>
+                        ) : error ? (
+                          <TableRow>
+                            <TableCell colSpan={5} align="center" className={styles.errorMessage}>
+                              Erro ao carregar produtos: {error.message}. Por favor, tente novamente.
+                            </TableCell>
+                          </TableRow>
+                        ) : produtos.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} align="center" className={styles.noData}>Nenhum produto encontrado.</TableCell>
+                          </TableRow>
+                        ) : (
+                          produtos.map(produto => (
+                            <ProdutoItem
+                              key={produto.id}
+                              produto={produto}
+                              onEditRequest={handleEditRequest}
+                              onProdutoDeleted={handleProdutoDeleted}
+                              showToast={showToast}
+                            />
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
 
-      {/* Conteúdo da Visão de Vendas */}
-      {currentView === 'vendas' && (
-        <>
-          <VendaForm
-            produtos={produtos}
-            onVendaRegistrada={() => {
-              fetchData();
-              showSuccessMessage('Venda registrada com sucesso!');
-            }}
-            onError={setError}
-          />
-
-          <hr />
-
-          <h2>Histórico de Vendas</h2>
-          <div className={styles.searchFilterContainer}> {/* Novo estilo para o container de filtro */}
-            <label htmlFor="filterProdutoVenda">Filtrar por Produto:</label>
-            <select
-              id="filterProdutoVenda"
-              value={filterProdutoVenda}
-              onChange={(e) => setFilterProdutoVenda(e.target.value)}
-            >
-              <option value="">Todos os Produtos</option>
-              {produtos.map(produto => (
-                <option key={produto.id} value={produto.id}>
-                  {produto.nome}
-                </option>
-              ))}
-            </select>
-
-            <label htmlFor="filterFormaPagamentoVenda" style={{ marginLeft: '20px' }}>Filtrar por Forma de Pagamento:</label>
-            <select
-              id="filterFormaPagamentoVenda"
-              value={filterFormaPagamentoVenda}
-              onChange={(e) => setFilterFormaPagamentoVenda(e.target.value)}
-            >
-              <option value="">Todas as Formas</option>
-              <option value="Dinheiro">Dinheiro</option>
-              <option value="Cartao de Credito">Cartão de Crédito</option>
-              <option value="Cartao de Debito">Cartão de Débito</option>
-              <option value="Pix">Pix</option>
-            </select>
-            <button
-                onClick={() => { setFilterProdutoVenda(''); setFilterFormaPagamentoVenda(''); }}
-                className={styles.secondaryButton}
-            >
-                Limpar Filtros
-            </button>
-          </div>
-
-          {filteredVendas.length === 0 ? (
-            <p>Nenhuma venda encontrada com os critérios de filtro.</p>
-          ) : (
-            <ul>
-              {filteredVendas.map(venda => (
-                <VendaItem key={venda.id} venda={venda} />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-
-      {/* Conteúdo da Visão de Relatórios */}
-      {currentView === 'relatorios' && (
-        <Relatorios produtos={produtos} vendas={vendas} />
-      )}
-    </div>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 4, p: 2, bgcolor: '#e0e0e0', borderRadius: '8px', boxShadow: 'var(--box-shadow)' }}>
+                    <Button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1 || loading}
+                      variant="contained"
+                      color="primary"
+                    >
+                      Anterior
+                    </Button>
+                    <Typography variant="body1" component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                      Página {currentPage} de {totalPages}
+                    </Typography>
+                    <Button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages || loading}
+                      variant="contained"
+                      color="primary"
+                    >
+                      Próxima
+                    </Button>
+                  </Box>
+                </Box>
+              } />
+              <Route path="/vendas" element={<Vendas showToast={showToast} />} />
+              <Route path="/relatorios" element={<Relatorios showToast={showToast} />} />
+              <Route path="/" element={<Typography variant="body1" align="center" sx={{ mt: 6, fontStyle: 'italic', color: '#777' }}>Bem-vindo ao Sistema de Gestão! Utilize a navegação acima para começar.</Typography>} />
+            </Routes>
+          </Paper>
+        </Container>
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      </Box>
+    </Router>
   );
 }
 

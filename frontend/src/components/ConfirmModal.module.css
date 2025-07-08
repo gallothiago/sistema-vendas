@@ -1,12 +1,11 @@
-/* frontend/src/components/ConfirmModal.module.css */
-
+/* sistema_de_vendas_novo/frontend/src/components/ConfirmModal.module.css */
 .modalOverlay {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -17,32 +16,19 @@
   background-color: white;
   padding: 30px;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   text-align: center;
-  max-width: 450px;
+  max-width: 400px;
   width: 90%;
-  animation: fadeIn 0.3s ease-out; /* Adiciona uma pequena animação */
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-.modalContent h3 {
-  color: #333;
-  margin-top: 0;
-  margin-bottom: 15px;
-  font-size: 1.4em;
 }
 
 .modalContent p {
   font-size: 1.1em;
-  color: #555;
   margin-bottom: 25px;
+  color: #333;
 }
 
-.buttonGroup {
+.modalActions {
   display: flex;
   justify-content: center;
   gap: 15px;
@@ -50,17 +36,17 @@
 
 .confirmButton,
 .cancelButton {
-  padding: 12px 25px;
+  padding: 10px 20px;
+  border: none;
   border-radius: 5px;
-  font-size: 1em;
   cursor: pointer;
-  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+  font-size: 1em;
+  transition: background-color 0.2s ease;
 }
 
 .confirmButton {
-  background-color: #dc3545; /* Vermelho para exclusão */
+  background-color: #dc3545; /* Vermelho para confirmar exclusão */
   color: white;
-  border: none;
 }
 
 .confirmButton:hover {
@@ -68,12 +54,10 @@
 }
 
 .cancelButton {
-  background-color: white;
-  color: #6c757d;
-  border: 1px solid #6c757d;
+  background-color: #6c757d;
+  color: white;
 }
 
 .cancelButton:hover {
-  background-color: #e2e6ea;
-  border-color: #545b62;
+  background-color: #5a6268;
 }
