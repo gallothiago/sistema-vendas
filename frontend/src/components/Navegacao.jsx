@@ -1,23 +1,24 @@
 // sistema_de_vendas_novo/frontend/src/components/Navegacao.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
-import styles from './Navegacao.module.css'; // Usaremos um CSS modular para ele
+import { Box, Button } from '@mui/material'; // Importa Box e Button do MUI
 
 function Navegacao() {
   return (
-    <nav className={styles.nav}>
-      <ul className={styles.navList}>
-        <li className={styles.navItem}>
-          <Link to="/produtos" className={styles.navLink}>Estoque de Produtos</Link>
-        </li>
-        <li className={styles.navItem}>
-          <Link to="/vendas" className={styles.navLink}>Registro de Vendas</Link>
-        </li>
-        <li className={styles.navItem}>
-          <Link to="/relatorios" className={styles.navLink}>Relatórios</Link>
-        </li>
-      </ul>
-    </nav>
+    <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 }, flexWrap: 'wrap', justifyContent: 'center' }}>
+      <Button component={Link} to="/" variant="text" sx={{ color: 'white' }}>
+        Início
+      </Button>
+      <Button component={Link} to="/produtos" variant="text" sx={{ color: 'white' }}>
+        Produtos
+      </Button>
+      <Button component={Link} to="/vendas" variant="text" sx={{ color: 'white' }}>
+        Vendas
+      </Button>
+      <Button component={Link} to="/relatorios" variant="text" sx={{ color: 'white' }}>
+        Relatórios
+      </Button>
+    </Box>
   );
 }
 

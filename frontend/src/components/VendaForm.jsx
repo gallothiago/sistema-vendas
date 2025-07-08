@@ -16,15 +16,25 @@ function VendaForm({ onVendaSaved, showToast }) {
   useEffect(() => {
     const fetchProdutosDisponiveis = async () => {
       try {
+        // A busca por per_page=999 deve retornar todos os produtos.
+        // Se houver um erro no backend, ele será capturado aqui.
         const response = await fetch('http://127.0.0.1:5000/produtos?per_page=999');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        setProdutosDisponiveis(data.produtos);
+        // Certifique-se de que 'data.produtos' é um array e contém os produtos.
+        if (data && Array.isArray(data.produtos)) {
+          setProdutosDisponiveis(data.produtos);
+        } else {
+          console.error("Resposta da API de produtos inesperada:", data);
+          showToast('Formato de dados de produtos inesperado!', 'error');
+          setProdutosDisponiveis([]); // Garante que a lista esteja vazia
+        }
       } catch (err) {
         console.error("Erro ao buscar produtos para venda:", err);
-        showToast('Erro ao carregar produtos para venda!', 'error');
+        showToast('Erro ao carregar produtos para venda! Verifique o console do backend.', 'error');
+        setProdutosDisponiveis([]); // Garante que a lista esteja vazia
       }
     };
     fetchProdutosDisponiveis();

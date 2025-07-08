@@ -2,7 +2,7 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from datetime import datetime
+from datetime import datetime, time, date
 import os
 
 # Configuração da aplicação Flask
@@ -57,7 +57,6 @@ class Venda(db.Model):
         return f'<Venda {self.id} - Produto: {self.produto_id}>'
 
     def to_dict(self):
-        # Acessa o nome do produto através do relacionamento 'produto'
         produto_nome = self.produto.nome if self.produto else 'Produto Desconhecido'
         return {
             'id': self.id,
@@ -103,7 +102,7 @@ def add_produto():
         return jsonify(new_produto.to_dict()), 201
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao adicionar produto: {e}") # Para debug
+        print(f"Erro ao adicionar produto: {e}")
         return jsonify({"error": f"Erro interno ao adicionar produto: {str(e)}"}), 500
 
 @app.route('/produtos', methods=['GET'])
@@ -149,7 +148,6 @@ def update_produto(id):
     if not isinstance(preco, (int, float)) or preco < 0:
         return jsonify({"error": "Preço deve ser um número não negativo."}), 400
 
-    # Verifica se o novo nome já existe para outro produto, excluindo o produto atual
     existing_produto = Produto.query.filter(
         Produto.nome == nome.strip(),
         Produto.id != id
@@ -165,22 +163,22 @@ def update_produto(id):
         return jsonify(produto.to_dict()), 200
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao atualizar produto: {e}") # Para debug
+        print(f"Erro ao atualizar produto: {e}")
         return jsonify({"error": f"Erro interno ao atualizar produto: {str(e)}"}), 500
 
 @app.route('/produtos/<int:id>', methods=['DELETE'])
 def delete_produto(id):
     produto = Produto.query.get_or_404(id)
-    if produto.vendas: # Verifica se existem vendas associadas
-        return jsonify({"error": "Não é possível excluir o produto porque existem vendas associadas a ele."}), 400
-
     try:
+        if produto.vendas:
+            return jsonify({"error": "Não é possível excluir o produto porque existem vendas associadas a ele."}), 400
+
         db.session.delete(produto)
         db.session.commit()
         return jsonify({"message": "Produto excluído com sucesso."}), 200
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao excluir produto: {e}") # Para debug
+        print(f"Erro ao excluir produto: {e}")
         return jsonify({"error": f"Erro interno ao excluir produto: {str(e)}"}), 500
 
 # Vendas
@@ -217,22 +215,21 @@ def add_venda():
             forma_pagamento=forma_pagamento.strip()
         )
         db.session.add(new_venda)
-        produto.quantidade -= quantidade # Reduz o estoque
+        produto.quantidade -= quantidade
         db.session.commit()
         return jsonify(new_venda.to_dict()), 201
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao adicionar venda: {e}") # Para debug
+        print(f"Erro ao adicionar venda: {e}")
         return jsonify({"error": f"Erro interno ao adicionar venda: {str(e)}"}), 500
 
 @app.route('/vendas', methods=['GET'])
 def get_vendas():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
-    
-    # Carrega vendas e faz um join com produtos para obter o nome
-    paginated_vendas = Venda.query.join(Produto).paginate(page=page, per_page=per_page, error_out=False)
-    
+
+    paginated_vendas = Venda.query.join(Produto).order_by(Venda.data_venda.desc()).paginate(page=page, per_page=per_page, error_out=False)
+
     vendas_data = [venda.to_dict() for venda in paginated_vendas.items]
     return jsonify({
         'vendas': vendas_data,
@@ -241,9 +238,69 @@ def get_vendas():
         'total_items': paginated_vendas.total
     })
 
-# Relatórios
+@app.route('/vendas/<int:id>', methods=['DELETE'])
+def delete_venda(id):
+    venda = Venda.query.get_or_404(id)
+    try:
+        produto = Produto.query.get(venda.produto_id)
+        if produto:
+            produto.quantidade += venda.quantidade
+
+        db.session.delete(venda)
+        db.session.commit()
+        return jsonify({"message": "Venda excluída com sucesso e estoque atualizado."}), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao excluir venda: {e}")
+        return jsonify({"error": f"Erro interno ao excluir venda: {str(e)}"}), 500
+
+
+# =======================
+# Rotas de Relatórios (COM FILTROS)
+# =======================
+
+def apply_venda_filters(query):
+    # Parâmetros de filtro
+    data_inicio_str = request.args.get('data_inicio')
+    data_fim_str = request.args.get('data_fim')
+    forma_pagamento_filtro = request.args.get('forma_pagamento_filtro')
+    produto_id_filtro = request.args.get('produto_id_filtro', type=int)
+
+    if data_inicio_str:
+        try:
+            # Pega o início do dia da data de início
+            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0)
+            query = query.filter(Venda.data_venda >= data_inicio)
+        except ValueError:
+            print(f"DEBUG: apply_venda_filters - data_inicio inválida: {data_inicio_str}")
+            pass # Ignora filtro inválido
+
+    if data_fim_str:
+        try:
+            # Pega o final do dia da data de fim
+            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59, microsecond=999999)
+            query = query.filter(Venda.data_venda <= data_fim)
+        except ValueError:
+            print(f"DEBUG: apply_venda_filters - data_fim inválida: {data_fim_str}")
+            pass # Ignora filtro inválido
+
+    if forma_pagamento_filtro and forma_pagamento_filtro != 'Todos': # Adiciona 'Todos' como opção para o frontend
+        query = query.filter(Venda.forma_pagamento == forma_pagamento_filtro)
+
+    if produto_id_filtro:
+        # Certifica-se de que a query tem o join com Produto para que o filtro de produto.id funcione
+        # Se a query já veio com join (e.g., de Venda.query.join(Produto)), isso não adiciona um join duplicado.
+        # Caso contrário, adiciona.
+        if Produto not in [mapper.class_ for mapper in query._join_entities]: # Verifica se Produto já está no join
+            query = query.join(Produto)
+        query = query.filter(Produto.id == produto_id_filtro)
+
+    return query
+
+
 @app.route('/relatorios/total_estoque', methods=['GET'])
 def total_estoque():
+    # Este relatório não precisa de filtros de venda
     total_produtos = Produto.query.count()
     valor_total_estoque = db.session.query(db.func.sum(Produto.quantidade * Produto.preco)).scalar() or 0
     return jsonify({
@@ -253,43 +310,87 @@ def total_estoque():
 
 @app.route('/relatorios/total_vendas', methods=['GET'])
 def total_vendas():
-    total_vendas = Venda.query.count()
-    valor_total_vendas = db.session.query(db.func.sum(Venda.preco_total)).scalar() or 0
+    query = Venda.query
+    query = apply_venda_filters(query) # Aplica os filtros na query base
+
+    print(f"\n--- DEBUG TOTAL VENDAS ---")
+    print(f"Filtros aplicados (request.args): {request.args}")
+
+    # Agora, use a 'query' já filtrada para contar e somar.
+    # Contagem de vendas
+    total_vendas_count = query.count()
+    print(f"Contagem de vendas após filtros: {total_vendas_count}")
+
+    # Para depurar, vamos buscar os itens da query antes de somar
+    vendas_filtradas = query.all()
+    print(f"Vendas filtradas para soma ({len(vendas_filtradas)} itens):")
+    for venda in vendas_filtradas:
+        print(f"  - ID: {venda.id}, Produto: {venda.produto_id}, Preco Total: {venda.preco_total}, Data: {venda.data_venda}")
+
+    # Calcular a soma manualmente a partir dos itens filtrados (para conferência)
+    manual_sum = sum(venda.preco_total for venda in vendas_filtradas)
+    print(f"Soma manual dos preco_total: {manual_sum}")
+
+    # Corrigido: Agora a soma usa a mesma query filtrada, para garantir consistência.
+    valor_total_vendas_sum = query.with_entities(db.func.sum(Venda.preco_total)).scalar() or 0
+    print(f"Soma do banco de dados (valor_total_vendas_sum): {valor_total_vendas_sum}")
+    print(f"--- FIM DEBUG TOTAL VENDAS ---\n")
+
     return jsonify({
-        'total_vendas_realizadas': total_vendas,
-        'valor_total_das_vendas': round(valor_total_vendas, 2)
+        'total_vendas_realizadas': total_vendas_count,
+        'valor_total_das_vendas': round(valor_total_vendas_sum, 2)
     })
 
 @app.route('/relatorios/vendas_por_mes', methods=['GET'])
 def vendas_por_mes():
-    vendas = db.session.query(
+    query = Venda.query
+    query = apply_venda_filters(query) # Aplica os filtros
+
+    # Corrigido: Agora o group by é feito sobre a query filtrada diretamente
+    # Certifique-se de que se houver um filtro de produto, o join com Produto exista.
+    # O `apply_venda_filters` já lida com o join se `produto_id_filtro` for usado.
+    vendas_por_mes_query = query.with_entities(
         db.func.strftime('%Y-%m', Venda.data_venda).label('mes_ano'),
         db.func.sum(Venda.preco_total).label('total_vendas')
     ).group_by('mes_ano').order_by('mes_ano').all()
 
-    vendas_agrupadas = [{'mes_ano': v.mes_ano, 'total_vendas': round(v.total_vendas, 2)} for v in vendas]
-    return jsonify(vendas_agrupadas)
+    result = []
+    for vm in vendas_por_mes_query:
+        year, month_num = map(int, vm.mes_ano.split('-'))
+        month_name = datetime(year, month_num, 1).strftime('%B').capitalize()
+        result.append({
+            'mes_ano': f"{month_name} de {year}",
+            'total_vendas': round(vm.total_vendas, 2)
+        })
+    return jsonify(result)
 
 @app.route('/relatorios/vendas_por_produto', methods=['GET'])
 def vendas_por_produto():
-    vendas = db.session.query(
-        Produto.nome.label('produto_nome'),
-        db.func.sum(Venda.preco_total).label('total_vendido')
-    ).join(Venda).group_by(Produto.nome).order_by(db.func.sum(Venda.preco_total).desc()).all()
+    query = Venda.query.join(Produto) # Começa com join para ter acesso ao nome do produto
+    query = apply_venda_filters(query) # Aplica os filtros
 
-    vendas_agrupadas = [{'produto_nome': item.produto_nome, 'total_vendido': round(item.total_vendido, 2)} for item in vendas]
-    return jsonify(vendas_agrupadas)
+    # Corrigido: o group_by é feito sobre a query já filtrada e com join
+    vendas_por_produto_query = query.with_entities(
+        Produto.nome,
+        db.func.sum(Venda.preco_total).label('total_vendido')
+    ).group_by(Produto.nome).order_by(db.func.sum(Venda.preco_total).desc()).all()
+
+    result = [{'produto_nome': vp.nome, 'total_vendido': round(vp.total_vendido, 2)} for vp in vendas_por_produto_query]
+    return jsonify(result)
 
 @app.route('/relatorios/receita_por_forma_pagamento', methods=['GET'])
 def receita_por_forma_pagamento():
-    receitas = db.session.query(
+    query = Venda.query
+    query = apply_venda_filters(query) # Aplica os filtros
+
+    # Corrigido: o group_by é feito sobre a query já filtrada
+    receita_por_forma_pagamento_query = query.with_entities(
         Venda.forma_pagamento,
         db.func.sum(Venda.preco_total).label('total_receita')
-    ).group_by(Venda.forma_pagamento).order_by(Venda.forma_pagamento).all()
+    ).group_by(Venda.forma_pagamento).order_by(db.func.sum(Venda.preco_total).desc()).all()
 
-    receitas_agrupadas = [{'forma_pagamento': r.forma_pagamento, 'total_receita': round(r.total_receita, 2)} for r in receitas]
-    return jsonify(receitas_agrupadas)
-
+    result = [{'forma_pagamento': rp.forma_pagamento, 'total_receita': round(rp.total_receita, 2)} for rp in receita_por_forma_pagamento_query]
+    return jsonify(result)
 
 # =======================
 # Inicialização da Aplicação
@@ -299,7 +400,7 @@ if __name__ == '__main__':
     # Garante que a pasta 'instance' exista antes de criar o banco de dados
     if not os.path.exists(os.path.join(basedir, 'instance')):
         os.makedirs(os.path.join(basedir, 'instance'))
-    
+
     with app.app_context():
-        db.create_all() # Cria as tabelas no banco de dados site.db
+        db.create_all()
     app.run(debug=True)

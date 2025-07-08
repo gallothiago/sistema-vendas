@@ -1,12 +1,20 @@
 // sistema_de_vendas_novo/frontend/src/App.jsx
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom'; // Importa Link do react-router-dom como RouterLink
 
 // Importações do MUI
-import { Container, AppBar, Toolbar, Typography, Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search'; // Exemplo de ícone, pode ser usado depois
-import InputAdornment from '@mui/material/InputAdornment'; // Para ícone no input
-import TextField from '@mui/material/TextField'; // Para o campo de busca
+import { Container, AppBar, Toolbar, Typography, Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, Grid, IconButton, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, useMediaQuery, useTheme, Divider } from '@mui/material'; // Adicionado Divider
+import MenuIcon from '@mui/icons-material/Menu';
+import HomeIcon from '@mui/icons-material/Home';
+import InventoryIcon from '@mui/icons-material/Inventory';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import CloseIcon from '@mui/icons-material/Close'; // Ícone para fechar o Drawer (opcional, mas útil)
+
+import SearchIcon from '@mui/icons-material/Search';
+import InputAdornment from '@mui/material/InputAdornment';
+import TextField from '@mui/material/TextField';
 
 // Importa todos os componentes necessários
 import ProdutoForm from './components/ProdutoForm';
@@ -17,9 +25,9 @@ import Toast from './components/Toast';
 import Navegacao from './components/Navegacao';
 import LoadingSpinner from './components/LoadingSpinner';
 
-// Importa os estilos CSS (agora mais enxutos)
-import './index.css'; // Alterado de App.css para index.css para o CSS global
-import styles from './App.module.css'; // Para layout principal e classes que não são de componentes MUI
+// Importa os estilos CSS
+import './index.css';
+import styles from './App.module.css';
 
 function App() {
   const [toast, setToast] = useState(null);
@@ -30,6 +38,10 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const showToast = (message, type) => {
     setToast({ message, type });
@@ -65,8 +77,12 @@ function App() {
 
   const handleProdutoSaved = async () => {
     setProdutoToEdit(null);
-    await fetchProdutos(1, searchTerm); // Sempre vai para a primeira página após salvar
-    setCurrentPage(1);
+    await fetchProdutos(currentPage, searchTerm);
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    } else if (totalPages === 0 && currentPage !== 1) {
+      setCurrentPage(1);
+    }
   };
 
   const handleEditRequest = (produto) => {
@@ -96,51 +112,123 @@ function App() {
     }
   };
 
+  const toggleDrawer = (open) => (event) => {
+    if (event.type === 'keydown' && (event.key === 'Tab' || event.key === 'Shift')) {
+      return;
+    }
+    setDrawerOpen(open);
+  };
+
+  const drawerItems = [
+    { text: 'Início', icon: <HomeIcon />, path: '/' },
+    { text: 'Produtos', icon: <InventoryIcon />, path: '/produtos' },
+    { text: 'Vendas', icon: <ShoppingCartIcon />, path: '/vendas' },
+    { text: 'Relatórios', icon: <AssessmentIcon />, path: '/relatorios' },
+  ];
+
   return (
     <Router>
       <Box className={styles.appContainer}>
         <AppBar position="static" sx={{ backgroundColor: 'secondary.main', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)' }}>
-          <Toolbar sx={{ flexDirection: 'column', paddingY: 2 }}>
-            <Typography variant="h1" component="div" sx={{ flexGrow: 1, color: 'white', fontSize: '2.2em', marginBottom: '15px' }}>
+          <Toolbar sx={{ flexDirection: isMobile ? 'row' : 'column', justifyContent: isMobile ? 'space-between' : 'center', alignItems: 'center', paddingY: { xs: 1, sm: 2 } }}>
+            {isMobile && (
+              <IconButton
+                edge="start"
+                color="inherit"
+                aria-label="menu"
+                onClick={toggleDrawer(true)}
+                sx={{ mr: 2 }}
+              >
+                <MenuIcon />
+              </IconButton>
+            )}
+            <Typography
+              variant="h1"
+              component="div"
+              sx={{ flexGrow: 1, color: 'white', fontSize: { xs: '1.5em', sm: '2em', md: '2.2em' }, textAlign: isMobile ? 'center' : 'center', marginBottom: isMobile ? '0' : '15px' }}
+            >
               Sistema de Gestão de Vendas
             </Typography>
-            <Navegacao />
+            {!isMobile && <Navegacao />}
           </Toolbar>
         </AppBar>
 
-        <Container component="main" maxWidth="lg" sx={{ flexGrow: 1, paddingY: 4, marginY: 4 }}>
-          <Paper elevation={3} sx={{ padding: 4, borderRadius: '10px' }}>
+        {/* Drawer para telas menores */}
+        <Drawer
+          anchor="left"
+          open={drawerOpen}
+          onClose={toggleDrawer(false)}
+        >
+          <Box
+            sx={{ width: 250 }}
+            role="presentation"
+            // remove onClick and onKeyDown from Box, apply to ListItemButton instead for better accessibility
+          >
+            {/* Cabeçalho do Drawer */}
+            <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'primary.main', color: 'white' }}>
+              <Typography variant="h6" component="div" sx={{ fontWeight: 500 }}>
+                Menu de Navegação
+              </Typography>
+              <IconButton onClick={toggleDrawer(false)} color="inherit" aria-label="fechar menu">
+                <CloseIcon />
+              </IconButton>
+            </Box>
+            <Divider /> {/* Linha divisória */}
+            <List>
+              {drawerItems.map((item) => (
+                <ListItem key={item.text} disablePadding>
+                  {/* Usar RouterLink para navegação do React Router DOM */}
+                  <ListItemButton component={RouterLink} to={item.path} onClick={toggleDrawer(false)}>
+                    <ListItemIcon>
+                      {item.icon}
+                    </ListItemIcon>
+                    <ListItemText primary={item.text} />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        </Drawer>
+
+
+        {/* Conteúdo principal */}
+        <Container component="main" maxWidth="lg" sx={{ flexGrow: 1, paddingY: { xs: 2, md: 4 }, marginY: { xs: 2, md: 4 } }}>
+          <Paper elevation={3} sx={{ padding: { xs: 2, sm: 3, md: 4 }, borderRadius: '10px' }}>
             <Routes>
               <Route path="/produtos" element={
                 <Box>
-                  <Typography variant="h2" component="h2" align="center" sx={{ mb: 4, color: 'primary.main' }}>
+                  <Typography variant="h2" component="h2" align="center" sx={{ mb: { xs: 2, md: 4 }, color: 'primary.main', fontSize: { xs: '1.8rem', sm: '2rem' } }}>
                     Gestão de Produtos
                   </Typography>
-                  <ProdutoForm
-                    produtoToEdit={produtoToEdit}
-                    onProdutoSaved={handleProdutoSaved}
-                    onCancelEdit={handleCancelEdit}
-                    showToast={showToast}
-                  />
 
-                  <Box sx={{ mb: 4, textAlign: 'center' }}>
-                    <TextField
-                      label="Buscar produto por nome"
-                      variant="outlined"
-                      value={searchTerm}
-                      onChange={handleSearchChange}
-                      sx={{ width: '60%', maxWidth: '500px' }}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
-                  </Box>
+                  <Grid container spacing={3} justifyContent="center" alignItems="center">
+                    <Grid item xs={12}>
+                      <ProdutoForm
+                        produtoToEdit={produtoToEdit}
+                        onProdutoSaved={handleProdutoSaved}
+                        onCancelEdit={handleCancelEdit}
+                        showToast={showToast}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={8} md={6} sx={{ textAlign: 'center' }}>
+                      <TextField
+                        label="Buscar produto por nome"
+                        variant="outlined"
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                        fullWidth
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <SearchIcon />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
 
-                  <TableContainer component={Paper} sx={{ mb: 4, borderRadius: '8px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)', border: '1px solid var(--border-color)' }}>
+                  <TableContainer component={Paper} sx={{ mt: { xs: 3, md: 4 }, mb: { xs: 3, md: 4 }, borderRadius: '8px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)', border: '1px solid var(--border-color)' }}>
                     <Table sx={{ minWidth: 650 }} aria-label="tabela de produtos">
                       <TableHead>
                         <TableRow>
@@ -183,7 +271,7 @@ function App() {
                     </Table>
                   </TableContainer>
 
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 4, p: 2, bgcolor: '#e0e0e0', borderRadius: '8px', boxShadow: 'var(--box-shadow)' }}>
+                  <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'center', alignItems: 'center', gap: { xs: 1, sm: 2 }, mt: { xs: 2, md: 4 }, p: { xs: 1.5, md: 2 }, bgcolor: '#e0e0e0', borderRadius: '8px', boxShadow: 'var(--box-shadow)' }}>
                     <Button
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1 || loading}
@@ -192,7 +280,7 @@ function App() {
                     >
                       Anterior
                     </Button>
-                    <Typography variant="body1" component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                    <Typography variant="body1" component="span" sx={{ fontWeight: 600, color: 'text.primary', fontSize: { xs: '0.9em', sm: '1em' } }}>
                       Página {currentPage} de {totalPages}
                     </Typography>
                     <Button
