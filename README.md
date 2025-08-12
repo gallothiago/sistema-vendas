@@ -10,7 +10,6 @@ Sistema completo de gestão de **vendas e estoque**, com interface frontend cons
 - [Pré-requisitos](#pré-requisitos)
 - [Instalação e Execução](#instalação-e-execução)
 
-
 ---
 
 ## Sobre
@@ -21,7 +20,7 @@ Este projeto implementa um sistema de vendas e controle de estoque, dividido em 
 
 ---
 
-## Funcionalidades (exemplos — ajustar conforme o projeto real)
+## Funcionalidades
 
 - Cadastro de produtos (nome, preço, quantidade em estoque).  
 - Listagem e edição de produtos cadastrados.  
@@ -52,15 +51,12 @@ Certifique-se de ter instalado:
 
 ## Instalação e Execução
 
-### Frontend
+
 
 ```bash
 cd frontend
 npm install
 npm run dev   # ou 'npm start' dependendo da configuração
-
-
-### Backend
 
 cd backend
 python -m venv venv        # criar ambiente virtual
@@ -68,3 +64,4 @@ source venv/bin/activate   # Linux/Mac (ou `venv\Scripts\activate` no Windows)
 pip install -r requirements.txt
 export FLASK_APP=app.py    # nome do script Flask principal (ajustar se diferente)
 flask run
+
